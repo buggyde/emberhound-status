@@ -1,31 +1,63 @@
-# Change these first
-owner: upptime # Your GitHub organization or username, where this repository lives
-repo: upptime # The name of this repository
+# EmberHound — status.emberhound.com
+# Upptime config. Monitors run every 5 minutes from GitHub Actions in
+# the EmberHound-Portal/emberhound-status repo.
+#
+# Why this lives in its own repo (not in the EmberHound app repo):
+# the status page MUST stay reachable when our primary infrastructure
+# is degraded. Hosting it on GitHub Pages with monitors firing from
+# GitHub Actions gives us that property by construction.
+
+owner: EmberHound-Portal
+repo: emberhound-status
 
 sites:
-  - name: Google
-    url: https://www.google.com
-  - name: Wikipedia
-    url: https://en.wikipedia.org
-  - name: Hacker News
-    url: https://news.ycombinator.com
-  - name: Test Broken Site
-    url: https://thissitedoesnotexist.koj.co
+  - name: Cloud Console
+    url: https://emberhound.com
+    expectedStatusCodes:
+      - 200
+
+  - name: API / Edge Functions
+    # Public no-auth health endpoint — see supabase/functions/health/
+    # in the main repo (PR #642). No DB calls; should respond < 500ms.
+    url: https://ibdkgzvygjbbaylxorhm.supabase.co/functions/v1/health
+    expectedStatusCodes:
+      - 200
+
+  - name: Agent Ingestion
+    # agent-contract is a public no-auth GET that returns the published
+    # contract metadata device agents download to validate their
+    # normalisers. Natural proxy for "agent comms layer is up".
+    url: https://ibdkgzvygjbbaylxorhm.supabase.co/functions/v1/agent-contract
+    expectedStatusCodes:
+      - 200
+
+  - name: Authentication
+    # Supabase Auth health endpoint. Public.
+    url: https://ibdkgzvygjbbaylxorhm.supabase.co/auth/v1/health
+    expectedStatusCodes:
+      - 200
 
 status-website:
-  # Add your custom domain name, or remove the `cname` line if you don't have a domain
-  # Uncomment the `baseUrl` line if you don't have a custom domain and add your repo name there
-  cname: demo.upptime.js.org
-  # baseUrl: /your-repo-name
-  logoUrl: https://raw.githubusercontent.com/upptime/upptime.js.org/master/static/img/icon.svg
-  name: Upptime
-  introTitle: "**Upptime** is the open-source uptime monitor and status page, powered entirely by GitHub."
-  introMessage: This is a sample status page which uses **real-time** data from our [GitHub repository](https://github.com/upptime/upptime). No server required — just GitHub Actions, Issues, and Pages. [**Get your own for free**](https://github.com/upptime/upptime)
+  cname: status.emberhound.com
+  name: EmberHound
+  logoUrl: https://emberhound.com/logo-icon.png
+  introTitle: EmberHound Service Status
+  introMessage: >-
+    Real-time and historical status of EmberHound services. Monitored
+    every five minutes from an independent GitHub Actions workflow.
+    For security issues, contact security@emberhound.com.
   navbar:
     - title: Status
       href: /
-    - title: GitHub
-      href: https://github.com/$OWNER/$REPO
+    - title: Trust Center
+      href: https://emberhound.com/trust
+    - title: Report a vulnerability
+      href: mailto:security@emberhound.com
 
-# Upptime also supports notifications, assigning issues, and more
-# See https://upptime.js.org/docs/configuration
+# Notifications on downtime: Upptime opens GitHub issues automatically.
+# Add Slack/email later via:
+#   https://upptime.js.org/docs/notifications
+
+# Assignees for downtime issues (your GitHub username/team)
+assignees:
+  - buggyde
