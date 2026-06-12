@@ -317,6 +317,18 @@ a:hover { color: #fff; }
 .metric__value--good { color: var(--up); }
 .metric__value--warn { color: var(--degraded); }
 .metric__value--bad  { color: var(--down); }
+.metric__value--limited { color: var(--ink-faint); }
+.metric__mark {
+  color: var(--accent); font-weight: 700;
+  font-size: .7em; vertical-align: super; margin-left: 1px;
+}
+.metric { cursor: default; }
+
+.uptime-note {
+  margin: 16px 0 0; max-width: 70ch;
+  font-size: .78rem; color: var(--ink-faint); line-height: 1.45;
+}
+.uptime-note span { color: var(--accent); font-weight: 700; }
 
 /* history strip */
 .history { padding-top: 16px; border-top: 1px solid var(--line-soft); }
