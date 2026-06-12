@@ -56,6 +56,9 @@
         </p>
       </section>
 
+      <!-- ACTIVE INCIDENTS / MAINTENANCE (populated by JS; hidden when none) -->
+      <section class="active" id="active" aria-label="Active incidents and maintenance" hidden></section>
+
       <!-- SERVICES -->
       <section class="services" aria-label="Monitored services">
         <div class="services__head">
@@ -73,6 +76,17 @@
           <div class="card card--skeleton" role="listitem"></div>
           <div class="card card--skeleton" role="listitem"></div>
         </div>
+      </section>
+
+      <!-- INCIDENT HISTORY -->
+      <section class="incidents" aria-label="Incident history">
+        <div class="services__head">
+          <h2 class="services__title">Incident History</h2>
+          <a class="incidents__report" href="https://github.com/buggyde/emberhound-status/issues/new?labels=status" target="_blank" rel="noopener">Report / log an incident &rarr;</a>
+        </div>
+        <ol id="incidents-list" class="incidents__list" aria-live="polite">
+          <li class="incidents__loading">Loading incident history&hellip;</li>
+        </ol>
       </section>
     </main>
 
