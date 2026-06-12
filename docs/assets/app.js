@@ -6,8 +6,9 @@
 
 "use strict";
 
-const SUMMARY_URL =
-  "https://raw.githubusercontent.com/buggyde/emberhound-status/master/history/summary.json";
+const HISTORY_BASE =
+  "https://raw.githubusercontent.com/buggyde/emberhound-status/master/history/";
+const SUMMARY_URL = HISTORY_BASE + "summary.json";
 
 const HISTORY_DAYS = 90;
 const REFRESH_MS = 60_000;
@@ -53,20 +54,56 @@ function latencyBand(ms) {
   return "metric__value--bad";
 }
 
-/* Build the trailing-N-days history model from the dailyMinutesDown map. */
-function buildHistory(dailyMinutesDown) {
+/* When each service began being monitored, by slug. Fetched once from
+   history/<slug>.yml (which carries a startTime) and cached — it never
+   changes, so we don't re-pull it on the 60s refresh. A null entry means
+   "we tried and couldn't determine it" (falls back to assuming up). */
+const startTimes = {};
+
+function midnight(date) {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+async function ensureStartTimes(services) {
+  const missing = services.filter((s) => s.slug && !(s.slug in startTimes));
+  await Promise.allSettled(missing.map(async (s) => {
+    startTimes[s.slug] = null; // mark attempted so we don't refetch on failure
+    try {
+      const r = await fetch(`${HISTORY_BASE}${s.slug}.yml?t=${Date.now()}`, { cache: "no-store" });
+      if (!r.ok) return;
+      const text = await r.text();
+      const m = text.match(/startTime:\s*['"]?([0-9T:.+\-Z]+)/i);
+      if (m) {
+        const d = new Date(m[1]);
+        if (!isNaN(d.getTime())) startTimes[s.slug] = d;
+      }
+    } catch (_) { /* leave null -> day-classifier assumes up, prior behaviour */ }
+  }));
+}
+
+/* Build the trailing-N-days history model from the dailyMinutesDown map.
+   Days before the service's startTime are "no data" rather than implying
+   uptime that was never actually measured. */
+function buildHistory(dailyMinutesDown, startTime) {
   const map = dailyMinutesDown || {};
   const days = [];
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  const today = midnight(new Date());
+  const startDay = startTime instanceof Date && !isNaN(startTime.getTime())
+    ? midnight(startTime) : null;
   for (let i = HISTORY_DAYS - 1; i >= 0; i--) {
     const d = new Date(today);
     d.setDate(d.getDate() - i);
+    if (startDay && d < startDay) {
+      days.push({ date: d, cls: "none", down: null, upPct: null, noData: true });
+      continue;
+    }
     const key = isoDay(d);
     const down = Object.prototype.hasOwnProperty.call(map, key) ? Number(map[key]) : null;
     const cls = dayClass(down);
     const upPct = down == null ? 100 : Math.max(0, (1440 - down) / 1440 * 100);
-    days.push({ date: d, cls, down, upPct });
+    days.push({ date: d, cls, down, upPct, noData: false });
   }
   return days;
 }
@@ -170,20 +207,32 @@ function card(service, index) {
 
   /* history strip */
   const hist = el("div", "history");
+  const startTime = startTimes[service.slug];
+  const days = buildHistory(service.dailyMinutesDown, startTime);
+  const monitored = days.filter((d) => !d.noData).length;
   const bar = el("div", "history__bar", { role: "img",
-    "aria-label": `Daily uptime for the last ${HISTORY_DAYS} days` });
-  const days = buildHistory(service.dailyMinutesDown);
+    "aria-label": `Daily uptime over the last ${monitored} monitored day${monitored === 1 ? "" : "s"}` });
   for (const day of days) {
     const tick = el("span", `tick tick--${day.cls}`);
-    const label = day.down == null
-      ? `${fmtDate(day.date)} · 100% uptime`
-      : `${fmtDate(day.date)} · ${day.upPct.toFixed(2)}% · ${day.down}m down`;
+    const label = day.noData
+      ? `${fmtDate(day.date)} · no monitoring data`
+      : (day.down == null
+          ? `${fmtDate(day.date)} · 100% uptime`
+          : `${fmtDate(day.date)} · ${day.upPct.toFixed(2)}% · ${day.down}m down`);
     tick.dataset.tip = label;
     bar.appendChild(tick);
   }
   hist.appendChild(bar);
+
   const foot = el("div", "history__foot");
-  foot.appendChild(el("span", null, { text: `${HISTORY_DAYS} days ago` }));
+  let leftLabel = `${HISTORY_DAYS} days ago`;
+  const startDay = startTime instanceof Date && !isNaN(startTime.getTime()) ? midnight(startTime) : null;
+  if (startDay) {
+    const earliest = midnight(new Date());
+    earliest.setDate(earliest.getDate() - (HISTORY_DAYS - 1));
+    if (startDay > earliest) leftLabel = `monitoring since ${fmtDate(startDay)}`;
+  }
+  foot.appendChild(el("span", null, { text: leftLabel }));
   foot.appendChild(el("span", null, { text: `${service.uptime} overall` }));
   hist.appendChild(foot);
   c.appendChild(hist);
@@ -201,7 +250,7 @@ function renderError(message) {
   $("#verdict").setAttribute("aria-busy", "false");
   $("#verdict-dot").setAttribute("data-state", "down");
   $("#verdict-headline").textContent = "Status Unavailable";
-  $("#verdict-sub").innerHTML = "Couldn’t reach the monitoring feed. Retrying automatically.";
+  $("#verdict-sub").textContent = "Couldn’t reach the monitoring feed. Retrying automatically.";
   const list = $("#services");
   list.textContent = "";
   const banner = el("div", "banner");
@@ -244,6 +293,7 @@ async function load() {
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
     if (!Array.isArray(data) || data.length === 0) throw new Error("empty feed");
+    await ensureStartTimes(data);
     renderVerdict(data);
     renderServices(data);
     markSynced("Upptime");
