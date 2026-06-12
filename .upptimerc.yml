@@ -1,13 +1,13 @@
 # EmberHound — status.emberhound.com
 # Upptime config. Monitors run every 5 minutes from GitHub Actions in
-# the EmberHound-Portal/emberhound-status repo.
+# the buggyde/emberhound-status repo.
 #
 # Why this lives in its own repo (not in the EmberHound app repo):
 # the status page MUST stay reachable when our primary infrastructure
 # is degraded. Hosting it on GitHub Pages with monitors firing from
 # GitHub Actions gives us that property by construction.
 
-owner: EmberHound-Portal
+owner: buggyde
 repo: emberhound-status
 
 sites:
@@ -18,24 +18,29 @@ sites:
 
   - name: API / Edge Functions
     # Public no-auth health endpoint — see supabase/functions/health/
-    # in the main repo (PR #642). No DB calls; should respond < 500ms.
+    # in the EmberHound-Portal/emberhound repo (PR #642). No DB calls;
+    # responds in < 500ms.
     url: https://ibdkgzvygjbbaylxorhm.supabase.co/functions/v1/health
     expectedStatusCodes:
       - 200
 
   - name: Agent Ingestion
     # agent-contract is a public no-auth GET that returns the published
-    # contract metadata device agents download to validate their
-    # normalisers. Natural proxy for "agent comms layer is up".
+    # contract metadata device agents download. Natural proxy for
+    # "agent comms layer is up".
     url: https://ibdkgzvygjbbaylxorhm.supabase.co/functions/v1/agent-contract
     expectedStatusCodes:
       - 200
 
   - name: Authentication
-    # Supabase Auth health endpoint. Public.
+    # Supabase Auth health endpoint. Returns 200 with apikey header,
+    # or 401 without it. We accept either — both mean the auth gateway
+    # is responding and not 5xx'ing. 5xx or timeout is the real
+    # failure mode we want to catch.
     url: https://ibdkgzvygjbbaylxorhm.supabase.co/auth/v1/health
     expectedStatusCodes:
       - 200
+      - 401
 
 status-website:
   cname: status.emberhound.com
@@ -54,10 +59,5 @@ status-website:
     - title: Report a vulnerability
       href: mailto:security@emberhound.com
 
-# Notifications on downtime: Upptime opens GitHub issues automatically.
-# Add Slack/email later via:
-#   https://upptime.js.org/docs/notifications
-
-# Assignees for downtime issues (your GitHub username/team)
 assignees:
   - buggyde
