@@ -286,6 +286,209 @@ function markSynced(generator) {
   if (generator) $("#generator").textContent = generator;
 }
 
+/* =========================================================================
+   Incidents & scheduled maintenance — read from GitHub Issues, matching
+   Upptime's conventions:
+     • incident   = issue labelled "status"  (+ a label per affected slug),
+                    title "<emoji> <Service> is down"; open = ongoing,
+                    closed = resolved; updates are comments.
+     • maintenance = issue labelled "maintenance" with a body block:
+                    <!-- start: <ISO>  end: <ISO>  expectedDown: a, b -->
+   GitHub's unauthenticated API allows 60 req/hr per IP, so this polls far
+   less often than the 60s status refresh.
+   ========================================================================= */
+const ISSUES_URL = "https://api.github.com/repos/buggyde/emberhound-status/issues";
+const INCIDENTS_REFRESH_MS = 180_000;     // 3 min
+const INCIDENT_HISTORY_MAX = 12;
+
+let serviceNames = {};                     // slug -> display name (from summary)
+
+function prettySlug(slug) {
+  return slug.replace(/-/g, " ").replace(/\b\w/g, (m) => m.toUpperCase());
+}
+function nameForSlug(slug) {
+  return serviceNames[slug] || prettySlug(slug);
+}
+
+function relTime(date) {
+  const s = Math.max(0, (Date.now() - date.getTime()) / 1000);
+  if (s < 90) return "just now";
+  const m = s / 60;
+  if (m < 60) return `${Math.round(m)}m ago`;
+  const h = m / 60;
+  if (h < 24) return `${Math.round(h)}h ago`;
+  return `${Math.round(h / 24)}d ago`;
+}
+function fmtDateTime(d) {
+  return `${MONTHS[d.getMonth()]} ${d.getDate()}, ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+function fmtDuration(ms) {
+  const min = Math.round(ms / 60000);
+  if (min < 60) return `${min}m`;
+  const h = Math.floor(min / 60), m = min % 60;
+  return m ? `${h}h ${m}m` : `${h}h`;
+}
+
+/* Slugs we know about, pulled from an issue's labels (everything except the
+   reserved Upptime labels). */
+const RESERVED_LABELS = new Set(["status", "maintenance", "bug", "enhancement",
+  "documentation", "duplicate", "good first issue", "help wanted", "invalid",
+  "question", "wontfix"]);
+
+function affectedSlugs(labels) {
+  return labels.map((l) => l.name).filter((n) => !RESERVED_LABELS.has(n));
+}
+
+/* Parse the <!-- start / end / expectedDown --> block from a maintenance body. */
+function parseMaintenance(body) {
+  const out = { start: null, end: null, expectedDown: [] };
+  if (!body) return out;
+  const block = body.match(/<!--([\s\S]*?)-->/);
+  const src = block ? block[1] : body;
+  const s = src.match(/start:\s*([^\s]+)/i);
+  const e = src.match(/end:\s*([^\s]+)/i);
+  const d = src.match(/expectedDown:\s*([^\n\r]+)/i);
+  if (s) { const dt = new Date(s[1]); if (!isNaN(dt.getTime())) out.start = dt; }
+  if (e) { const dt = new Date(e[1]); if (!isNaN(dt.getTime())) out.end = dt; }
+  if (d) out.expectedDown = d[1].split(",").map((x) => x.trim()).filter(Boolean);
+  return out;
+}
+
+function serviceChips(slugs) {
+  const wrap = el("span", "chips");
+  slugs.forEach((slug) => wrap.appendChild(el("span", "chip", { text: nameForSlug(slug) })));
+  return wrap;
+}
+
+/* A prominent banner for something happening now (open incident or
+   in-window maintenance). */
+function activeCard(kind, issue, extra) {
+  const card = el("article", `incident-banner incident-banner--${kind}`);
+  const head = el("div", "incident-banner__head");
+  head.appendChild(el("span", "incident-banner__tag",
+    { text: kind === "maintenance" ? "Maintenance" : "Active incident" }));
+  head.appendChild(el("span", "incident-banner__since",
+    { text: extra.sinceLabel }));
+  card.appendChild(head);
+
+  const a = el("a", "incident-banner__title",
+    { href: issue.html_url, target: "_blank", rel: "noopener", text: issue.title });
+  card.appendChild(a);
+
+  if (extra.slugs && extra.slugs.length) card.appendChild(serviceChips(extra.slugs));
+  if (extra.note) card.appendChild(el("p", "incident-banner__note", { text: extra.note }));
+  return card;
+}
+
+function renderActive(incidents, maintenance) {
+  const root = $("#active");
+  root.textContent = "";
+  const now = Date.now();
+  const items = [];
+
+  incidents.filter((i) => i.state === "open").forEach((i) => {
+    items.push(activeCard("incident", i, {
+      slugs: affectedSlugs(i.labels),
+      sinceLabel: `down since ${fmtDateTime(new Date(i.created_at))} · ${relTime(new Date(i.created_at))}`,
+    }));
+  });
+
+  maintenance.forEach((m) => {
+    const info = parseMaintenance(m.body);
+    const inWindow = info.start && info.end && now >= info.start.getTime() && now <= info.end.getTime();
+    const upcoming = info.start && now < info.start.getTime();
+    if (m.state === "open" && (inWindow || upcoming)) {
+      const when = info.start && info.end
+        ? `${fmtDateTime(info.start)} → ${fmtDateTime(info.end)}`
+        : "window not specified";
+      items.push(activeCard("maintenance", m, {
+        slugs: info.expectedDown,
+        sinceLabel: (inWindow ? "in progress · " : "scheduled · ") + when,
+      }));
+    }
+  });
+
+  if (!items.length) { root.hidden = true; return; }
+  root.hidden = false;
+  items.forEach((n) => root.appendChild(n));
+}
+
+function incidentRow(issue) {
+  const li = el("li", "inc");
+  const open = issue.state === "open";
+  li.classList.add(open ? "inc--open" : "inc--resolved");
+
+  const dot = el("span", "inc__dot");
+  li.appendChild(dot);
+
+  const main = el("div", "inc__main");
+  const a = el("a", "inc__title",
+    { href: issue.html_url, target: "_blank", rel: "noopener", text: issue.title });
+  main.appendChild(a);
+
+  const meta = el("div", "inc__meta");
+  const created = new Date(issue.created_at);
+  meta.appendChild(el("span", null, { text: fmtDateTime(created) }));
+  const slugs = affectedSlugs(issue.labels);
+  if (slugs.length) {
+    meta.appendChild(el("span", "inc__sep", { text: "·" }));
+    meta.appendChild(el("span", null, { text: slugs.map(nameForSlug).join(", ") }));
+  }
+  if (!open && issue.closed_at) {
+    meta.appendChild(el("span", "inc__sep", { text: "·" }));
+    meta.appendChild(el("span", null,
+      { text: `resolved in ${fmtDuration(new Date(issue.closed_at) - created)}` }));
+  }
+  main.appendChild(meta);
+  li.appendChild(main);
+
+  li.appendChild(el("span", `inc__state inc__state--${open ? "open" : "resolved"}`,
+    { text: open ? "Ongoing" : "Resolved" }));
+  return li;
+}
+
+function renderIncidentHistory(incidents) {
+  const list = $("#incidents-list");
+  list.textContent = "";
+  if (!incidents.length) {
+    const li = el("li", "incidents__empty");
+    li.appendChild(el("span", "incidents__empty-dot"));
+    li.append("No incidents reported. All clear.");
+    list.appendChild(li);
+    return;
+  }
+  incidents
+    .slice()
+    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+    .slice(0, INCIDENT_HISTORY_MAX)
+    .forEach((i) => list.appendChild(incidentRow(i)));
+}
+
+async function loadIssues() {
+  try {
+    const res = await fetch(
+      `${ISSUES_URL}?state=all&per_page=50&sort=updated&direction=desc`,
+      { headers: { Accept: "application/vnd.github+json" }, cache: "no-store" });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const all = (await res.json()).filter((i) => !i.pull_request);
+    const has = (i, name) => i.labels.some((l) => l.name === name);
+    const incidents = all.filter((i) => has(i, "status"));
+    const maintenance = all.filter((i) => has(i, "maintenance"));
+    renderActive(incidents, maintenance);
+    renderIncidentHistory(incidents);
+  } catch (err) {
+    // Non-fatal: leave the status page fully functional if the issues API
+    // is rate-limited or unreachable.
+    const list = $("#incidents-list");
+    if (list && list.querySelector(".incidents__loading")) {
+      list.textContent = "";
+      const li = el("li", "incidents__empty");
+      li.append("Incident history is temporarily unavailable.");
+      list.appendChild(li);
+    }
+  }
+}
+
 /* ----------------------------------------------------------------- load */
 async function load() {
   try {
@@ -293,6 +496,7 @@ async function load() {
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
     if (!Array.isArray(data) || data.length === 0) throw new Error("empty feed");
+    serviceNames = Object.fromEntries(data.map((s) => [s.slug, s.name]));
     await ensureStartTimes(data);
     renderVerdict(data);
     renderServices(data);
@@ -302,5 +506,9 @@ async function load() {
   }
 }
 
-load();
+/* First status load populates serviceNames, then incidents load with names
+   ready. Both then poll on independent intervals (incidents far less often
+   because of GitHub's API rate limits). */
+load().then(loadIssues);
 setInterval(load, REFRESH_MS);
+setInterval(loadIssues, INCIDENTS_REFRESH_MS);

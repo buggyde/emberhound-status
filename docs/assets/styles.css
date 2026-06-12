@@ -368,6 +368,93 @@ a:hover { color: #fff; }
 }
 .banner b { color: var(--down); font-weight: 600; }
 
+/* ---------------------------------------------------------------- active incidents */
+.active { display: flex; flex-direction: column; gap: 12px; margin-bottom: 30px; }
+.incident-banner {
+  position: relative;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 18px clamp(18px, 2.5vw, 24px) 18px 22px;
+  background: linear-gradient(180deg, var(--panel-2), var(--panel));
+  overflow: hidden;
+}
+.incident-banner::before {
+  content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 4px;
+}
+.incident-banner--incident { border-color: hsl(0 72% 55% / .4); }
+.incident-banner--incident::before { background: var(--down); box-shadow: 0 0 16px var(--down-glow); }
+.incident-banner--maintenance { border-color: hsl(268 40% 56% / .45); }
+.incident-banner--maintenance::before { background: var(--primary); box-shadow: 0 0 16px var(--primary-glow); }
+
+.incident-banner__head {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 8px;
+}
+.incident-banner__tag {
+  font-size: .66rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase;
+  padding: 4px 9px; border-radius: 999px;
+}
+.incident-banner--incident .incident-banner__tag { color: var(--down); background: hsl(0 72% 55% / .12); }
+.incident-banner--maintenance .incident-banner__tag { color: var(--primary-soft); background: hsl(268 40% 56% / .15); }
+.incident-banner__since {
+  font-size: .78rem; color: var(--ink-dim); font-variant-numeric: tabular-nums;
+}
+.incident-banner__title {
+  display: inline-block; font-weight: 600; font-size: 1.08rem; color: var(--ink);
+  letter-spacing: -.01em;
+}
+.incident-banner__title:hover { color: var(--primary-soft); }
+.incident-banner__note { margin: 8px 0 0; color: var(--ink-dim); font-size: .9rem; }
+
+.chips { display: inline-flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.chip {
+  font-size: .7rem; font-weight: 500; color: var(--ink-soft);
+  padding: 3px 9px; border-radius: 999px;
+  border: 1px solid var(--line); background: var(--bg-2);
+}
+
+/* ---------------------------------------------------------------- incident history */
+.incidents { margin-top: 40px; }
+.incidents__report { font-size: .82rem; font-weight: 500; color: var(--primary-soft); }
+.incidents__report:hover { color: #fff; }
+.incidents__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.incidents__loading { color: var(--ink-faint); font-size: .9rem; padding: 6px 0; }
+.incidents__empty {
+  display: flex; align-items: center; gap: 10px;
+  color: var(--ink-dim); font-size: .92rem; padding: 14px 0;
+}
+.incidents__empty-dot {
+  width: 8px; height: 8px; border-radius: 50%; background: var(--up);
+  box-shadow: 0 0 10px var(--up-glow);
+}
+
+.inc {
+  display: flex; align-items: flex-start; gap: 14px;
+  padding: 15px 4px;
+  border-bottom: 1px solid var(--line-soft);
+}
+.inc:last-child { border-bottom: 0; }
+.inc__dot {
+  flex: none; width: 9px; height: 9px; border-radius: 50%; margin-top: 6px;
+}
+.inc--open .inc__dot     { background: var(--down); box-shadow: 0 0 10px var(--down-glow); animation: blink 1.1s steps(2,start) infinite; }
+.inc--resolved .inc__dot { background: var(--up); }
+.inc__main { flex: 1 1 auto; min-width: 0; }
+.inc__title {
+  display: inline-block; font-weight: 600; font-size: .98rem; color: var(--ink);
+}
+.inc__title:hover { color: var(--primary-soft); }
+.inc__meta {
+  display: flex; flex-wrap: wrap; gap: 7px; margin-top: 4px;
+  font-size: .78rem; color: var(--ink-faint); font-variant-numeric: tabular-nums;
+}
+.inc__sep { color: var(--line); }
+.inc__state {
+  flex: none; font-size: .66rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+  padding: 4px 10px; border-radius: 999px; border: 1px solid var(--line);
+}
+.inc__state--open     { color: var(--down); background: hsl(0 72% 55% / .1); border-color: hsl(0 72% 55% / .35); }
+.inc__state--resolved { color: var(--up);   background: hsl(142 69% 58% / .08); border-color: hsl(142 60% 45% / .3); }
+
 /* ---------------------------------------------------------------- footer */
 .footer { margin-top: 48px; padding-top: 22px; border-top: 1px solid var(--line-soft); }
 .footer__meta {
