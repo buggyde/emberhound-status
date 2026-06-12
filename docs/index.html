@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>EmberHound — Service Status</title>
+  <meta name="description" content="Real-time and historical status of EmberHound services. Monitored every five minutes from an independent GitHub Actions workflow." />
+  <meta name="theme-color" content="#140c1d" />
+  <link rel="icon" href="https://emberhound.com/logo-icon.png" />
+
+  <!-- Open Graph -->
+  <meta property="og:title" content="EmberHound — Service Status" />
+  <meta property="og:description" content="Real-time and historical status of EmberHound services." />
+  <meta property="og:image" content="https://emberhound.com/logo-icon.png" />
+  <meta property="og:type" content="website" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+
+  <link rel="stylesheet" href="assets/styles.css" />
+</head>
+<body>
+  <!-- atmosphere layers -->
+  <div class="bg-glow" aria-hidden="true"></div>
+  <div class="bg-grain" aria-hidden="true"></div>
+  <div class="bg-scan" aria-hidden="true"></div>
+
+  <div class="shell">
+    <header class="masthead">
+      <a class="wordmark" href="/" aria-label="EmberHound status home">
+        <span class="wordmark__mark">
+          <img src="https://emberhound.com/logo-icon.png" alt="" width="34" height="34" aria-hidden="true" />
+        </span>
+        <span class="wordmark__text">EmberHound</span>
+        <span class="wordmark__tag">Status</span>
+      </a>
+
+      <nav class="nav" aria-label="Primary">
+        <a class="nav__link nav__link--active" href="/">Status</a>
+        <a class="nav__link" href="https://emberhound.com/trust">Trust Center</a>
+        <a class="nav__link nav__link--cta" href="mailto:security@emberhound.com">Report a vulnerability</a>
+      </nav>
+    </header>
+
+    <main>
+      <!-- HERO VERDICT -->
+      <section class="verdict" id="verdict" aria-live="polite" aria-busy="true">
+        <p class="verdict__eyebrow">System Status</p>
+        <div class="verdict__line">
+          <span class="verdict__dot" id="verdict-dot" data-state="loading"></span>
+          <h1 class="verdict__headline" id="verdict-headline">Connecting&hellip;</h1>
+        </div>
+        <p class="verdict__sub" id="verdict-sub">
+          Fetching live signal from the monitoring workflow.
+        </p>
+      </section>
+
+      <!-- SERVICES -->
+      <section class="services" aria-label="Monitored services">
+        <div class="services__head">
+          <h2 class="services__title">Services</h2>
+          <span class="services__legend">
+            <span class="legend__item"><i class="legend__sw legend__sw--up"></i>Operational</span>
+            <span class="legend__item"><i class="legend__sw legend__sw--degraded"></i>Degraded</span>
+            <span class="legend__item"><i class="legend__sw legend__sw--down"></i>Down</span>
+          </span>
+        </div>
+        <div id="services" class="services__list" role="list">
+          <!-- skeleton placeholders, replaced on load -->
+          <div class="card card--skeleton" role="listitem"></div>
+          <div class="card card--skeleton" role="listitem"></div>
+          <div class="card card--skeleton" role="listitem"></div>
+          <div class="card card--skeleton" role="listitem"></div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <div class="footer__meta">
+        <span class="footer__sync" id="sync">
+          <span class="footer__sync-dot"></span>
+          <span id="sync-text">syncing&hellip;</span>
+        </span>
+        <span class="footer__sep" aria-hidden="true">/</span>
+        <span class="footer__gen" id="generator">Upptime</span>
+      </div>
+      <p class="footer__note">
+        Monitored every five minutes from an independent GitHub&nbsp;Actions workflow, so this page stays
+        reachable when primary infrastructure is degraded. Security issues:
+        <a href="mailto:security@emberhound.com">security@emberhound.com</a>.
+      </p>
+    </footer>
+  </div>
+
+  <!-- floating tooltip for history ticks -->
+  <div class="tip" id="tip" role="status" aria-hidden="true"></div>
+
+  <script src="assets/app.js" defer></script>
+</body>
+</html>
