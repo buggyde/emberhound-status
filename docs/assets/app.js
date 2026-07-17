@@ -181,6 +181,8 @@ function card(service, index) {
   top.appendChild(pill);
   c.appendChild(top);
 
+  const startTime = startTimes[service.slug];
+
   /* metrics */
   const metrics = el("div", "card__metrics");
   const lat = el("div", "metric metric--latency");
@@ -191,23 +193,40 @@ function card(service, index) {
   lat.appendChild(latVal);
   metrics.appendChild(lat);
 
+  /* Uptime windows. Upptime computes each as (successful checks ÷ checks
+     performed) over the window — so a service monitored for only a few hours
+     reports 100% for "1y" simply because every check so far passed. We know
+     each service's data age (from startTime), so any window whose span
+     exceeds that age is flagged "limited" rather than implying a full window
+     of evidence. Windows un-flag themselves as real history accumulates. */
+  const DAY = 86_400_000;
   const windows = [
-    ["24h", service.uptimeDay],
-    ["7d",  service.uptimeWeek],
-    ["30d", service.uptimeMonth],
-    ["1y",  service.uptimeYear],
+    ["24h", service.uptimeDay,   DAY],
+    ["7d",  service.uptimeWeek,  7 * DAY],
+    ["30d", service.uptimeMonth, 30 * DAY],
+    ["1y",  service.uptimeYear,  365 * DAY],
   ];
-  for (const [label, val] of windows) {
+  const dataAgeMs = startTime instanceof Date && !isNaN(startTime.getTime())
+    ? Date.now() - startTime.getTime() : null;
+  const sinceLabel = startTime instanceof Date && !isNaN(startTime.getTime())
+    ? `${MONTHS[startTime.getMonth()]} ${startTime.getDate()}` : "monitoring start";
+  for (const [label, val, span] of windows) {
     const m = el("div", "metric");
     m.appendChild(el("span", "metric__label", { text: label }));
-    m.appendChild(el("span", "metric__value", { text: val ?? "—" }));
+    const limited = dataAgeMs != null && dataAgeMs < span;
+    const v = el("span", `metric__value${limited ? " metric__value--limited" : ""}`,
+      { text: val ?? "—" });
+    if (limited) {
+      v.appendChild(el("span", "metric__mark", { text: "*", "aria-hidden": "true" }));
+      m.title = `${val} of checks since monitoring began (${sinceLabel}) — less than ${label} of history`;
+    }
+    m.appendChild(v);
     metrics.appendChild(m);
   }
   c.appendChild(metrics);
 
   /* history strip */
   const hist = el("div", "history");
-  const startTime = startTimes[service.slug];
   const days = buildHistory(service.dailyMinutesDown, startTime);
   const monitored = days.filter((d) => !d.noData).length;
   const bar = el("div", "history__bar", { role: "img",
@@ -244,6 +263,8 @@ function renderServices(services) {
   const list = $("#services");
   list.textContent = "";
   services.forEach((s, i) => list.appendChild(card(s, i)));
+  const note = $("#uptime-note");
+  if (note) note.hidden = !list.querySelector(".metric__value--limited");
 }
 
 function renderError(message) {
